@@ -5,6 +5,10 @@ from datetime import date as Date
 from typing import Any, Dict, Optional
 
 import httpx
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 
