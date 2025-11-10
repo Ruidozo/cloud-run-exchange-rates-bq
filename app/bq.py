@@ -39,12 +39,12 @@ def ensure_staging_table(client: bigquery.Client, dataset_id: str, staging_table
         bigquery.SchemaField("timestamp", "INTEGER", mode="NULLABLE"),
     ]
     
+    # Check if table exists if not creates it
     try:
-        # Try to get existing table
         client.get_table(table_ref)
         logger.info("Staging table %s already exists", staging_table_id)
     except Exception:
-        # Create if doesn't exist
+
         table = bigquery.Table(table_ref, schema=schema)
         client.create_table(table)
         logger.info("Created staging table %s", staging_table_id)

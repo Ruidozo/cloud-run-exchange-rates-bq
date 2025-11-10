@@ -142,7 +142,7 @@ cloud-run-exchange-rates-bq/
 ### 1. Clone Repository
 
 ```bash
-git clone <repository-url>
+git clone [<repository-url>](https://github.com/Ruidozo/cloud-run-exchange-rates-bq)
 cd cloud-run-exchange-rates-bq
 ```
 
