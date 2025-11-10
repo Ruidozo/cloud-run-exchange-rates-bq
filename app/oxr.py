@@ -20,7 +20,7 @@ def fetch_historical_rates(
     retry_delay: int = 2,
 ) -> Dict[str, Any]:
     """
-    Fetch historical exchange rates from Open Exchange Rates API (USD base).
+    Fetches historical exchange rates from Open Exchange Rates API (USD base).
 
     Args:
         day: Python date object.

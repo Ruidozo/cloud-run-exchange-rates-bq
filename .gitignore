@@ -48,6 +48,7 @@ service-account-key.json
 # Logs
 *.log
 logs/
+DEMO.md
 
 # OS
 .DS_Store

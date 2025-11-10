@@ -9,7 +9,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from app.converter import convert_usd_to_eur_base
 from app.oxr import fetch_historical_rates
 
-CURRENCIES = ["USD", "EUR", "GBP", "JPY", "CHF"]
+CURRENCIES = ["USD", "GBP", "JPY", "CHF"]
 
 
 def validate_today():
