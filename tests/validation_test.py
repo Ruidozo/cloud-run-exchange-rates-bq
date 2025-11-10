@@ -1,4 +1,7 @@
-"""Simple exchange rate validation test."""
+# tests/validation_test.py
+# Validation script to check exchange rates fetched from Open Exchange Rates API.
+# It can validate today's rates or rates over the last 30 days, showing statistics.
+
 
 import sys
 from datetime import date, timedelta

@@ -1,4 +1,7 @@
-"""BigQuery integration Test."""
+# tests/test_bq.py
+# Integration tests for BigQuery upsert functionality.
+# This script tests inserting and updating exchange rate records
+# into a BigQuery table using the upsert mechanism defined in app/bq.py.
 
 import logging
 import sys

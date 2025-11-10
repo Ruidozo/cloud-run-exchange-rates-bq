@@ -21,7 +21,7 @@ if __name__ == "__main__":
     
     try:
         rates = fetch_historical_rates(today)
-        print(f"✅ Success!")
+        print(f"Success!")
         print(f"Base currency: {rates.get('base')}")
         print(f"Timestamp: {rates.get('timestamp')}")
         print(f"Number of rates: {len(rates.get('rates', {}))}")
@@ -30,7 +30,7 @@ if __name__ == "__main__":
         print(f"  GBP: {rates.get('rates', {}).get('GBP')}")
         print(f"  JPY: {rates.get('rates', {}).get('JPY')}")
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"Error: {e}")
     
     # Test with a past date
     past_date = date.today() - timedelta(days=7)
@@ -38,7 +38,7 @@ if __name__ == "__main__":
     
     try:
         rates = fetch_historical_rates(past_date)
-        print(f"✅ Success!")
+        print(f"Success!")
         print(f"EUR rate: {rates.get('rates', {}).get('EUR')}")
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"Error: {e}")

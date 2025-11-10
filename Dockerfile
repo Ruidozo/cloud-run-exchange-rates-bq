@@ -13,7 +13,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY app/ ./app/
 
-# Expose port (Cloud Run will override this)
+# Expose port
 EXPOSE 8080
 
 # Run the application

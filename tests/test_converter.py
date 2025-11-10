@@ -1,4 +1,6 @@
-"""Test currency conversion utilities."""
+# tests/test_converter.py
+# Integration tests for currency conversion from USD to EUR base.
+# This script tests the conversion logic defined in app/converter.py.
 
 import logging
 import sys

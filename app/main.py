@@ -1,3 +1,9 @@
+# app/main.py
+# Main FastAPI application for currency exchange rates ingestion service.
+# This application fetches exchange rates from Open Exchange Rates API,
+# converts them to EUR base, and upserts them into BigQuery using a staging table pattern
+
+
 import logging
 import os
 from datetime import date, timedelta

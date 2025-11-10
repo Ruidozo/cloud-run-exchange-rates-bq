@@ -1,3 +1,7 @@
+# app/oxr.py
+# Module for fetching exchange rates from Open Exchange Rates API.
+# This module provides a function to fetch historical rates with retry logic.
+
 import logging
 import os
 import time
@@ -60,5 +64,5 @@ def fetch_historical_rates(
                 logger.error("All %d attempts failed for %s", max_retries, day)
                 raise
 
-    # Should never reach here:
+
     raise RuntimeError("Unexpected error in fetch_historical_rates")

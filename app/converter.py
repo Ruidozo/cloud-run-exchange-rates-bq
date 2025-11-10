@@ -1,4 +1,7 @@
-"""Currency conversion for exchange rates."""
+# app/converter.py
+# Module for converting exchange rates from USD base to EUR base.
+# This module provides a function to perform the conversion
+
 
 import logging
 from typing import Any, Dict

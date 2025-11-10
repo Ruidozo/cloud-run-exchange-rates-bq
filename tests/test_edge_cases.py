@@ -1,4 +1,7 @@
-"""Test edge cases and update logic for exchange rates pipeline."""
+# tests/test_edge_cases.py
+# Test edge cases for currency conversion and BigQuery upsert logic.
+# This script tests scenarios such as missing EUR in the API response,
+# handling of empty or malformed data, and verifies the update logic.
 
 import logging
 

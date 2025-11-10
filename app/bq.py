@@ -1,4 +1,7 @@
-"""BigQuery client for exchange rates ingestion."""
+# app/bq.py
+# BigQuery interaction module for upserting exchange rates using a staging table pattern.
+# This module provides functions to ensure the staging table exists,
+# truncate it, load new data, and merge it into the main table.
 
 import logging
 import os
