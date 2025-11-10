@@ -1,24 +1,23 @@
-"""Main application entry point for Cloud Run service."""
+import logging
+import os
 
-from flask import Flask, jsonify
+from fastapi import FastAPI
 
-app = Flask(__name__)
+logging.basicConfig(level=logging.INFO)
 
-
-@app.route("/", methods=["GET"])
-def health_check():
-    """Health check endpoint."""
-    return jsonify({"status": "healthy", "service": "exchange-rates-ingestion"}), 200
+app = FastAPI(title="Currency Exchange Rates Service")
 
 
-@app.route("/ingest", methods=["POST"])
-def ingest_exchange_rates():
-    """Ingest exchange rates from Open Exchange Rates API to BigQuery."""
-    # TODO: Implement exchange rates ingestion logic
-    return jsonify({"message": "Ingestion endpoint - to be implemented"}), 200
+@app.get("/health")
+def health():
+    logging.info("Health check called")
+    return {"status": "ok"}
 
 
-if __name__ == "__main__":
-    import os
-    port = int(os.environ.get("PORT", 8080))
-    app.run(host="0.0.0.0", port=port, debug=True)
+@app.get("/")
+def run():
+    logging.info("Root endpoint called")
+    return {
+        "message": "Currency Exchange Rates pipeline placeholder",
+        "project_id": os.getenv("PROJECT_ID", "local-dev"),
+    }
