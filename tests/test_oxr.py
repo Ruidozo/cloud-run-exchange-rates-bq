@@ -1,3 +1,9 @@
+# tests/test_oxr.py
+# Integration tests for Open Exchange Rates API.
+# This script tests fetching historical exchange rates
+# using the function defined in app/oxr.py.
+
+
 import logging
 import sys
 from datetime import date, timedelta
