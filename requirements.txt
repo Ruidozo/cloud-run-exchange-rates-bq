@@ -1,0 +1,17 @@
+# Web framework
+Flask==3.0.0
+gunicorn==21.2.0
+
+# Google Cloud
+google-cloud-bigquery==3.14.1
+google-cloud-logging==3.9.0
+
+# HTTP requests
+requests==2.31.0
+
+# Environment management
+python-dotenv==1.0.0
+
+# Testing (optional for later)
+pytest==7.4.3
+pytest-cov==4.1.0
