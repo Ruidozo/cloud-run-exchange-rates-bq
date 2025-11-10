@@ -2,8 +2,14 @@
 
 import logging
 import sys
+import time
 from datetime import date
 from pathlib import Path
+
+from dotenv import load_dotenv
+
+# Load environment variables first
+load_dotenv()
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -16,42 +22,45 @@ def test_bq_insert():
     """Test inserting sample records into BigQuery."""
     print("\n=== Testing BigQuery Insert ===\n")
     
+    current_timestamp = int(time.time())  # Get current Unix timestamp
+    
     # Create sample records
     test_records = [
         {
             "date": date.today().isoformat(),
             "currency": "USD",
             "rate_to_eur": 1.156261,
-            "timestamp": 1731196800,
+            "timestamp": current_timestamp,
         },
         {
             "date": date.today().isoformat(),
             "currency": "GBP",
             "rate_to_eur": 0.878617,
-            "timestamp": 1731196800,
+            "timestamp": current_timestamp,
         },
         {
             "date": date.today().isoformat(),
             "currency": "EUR",
             "rate_to_eur": 1.0,
-            "timestamp": 1731196800,
+            "timestamp": current_timestamp,
         },
         {
             "date": date.today().isoformat(),
             "currency": "JPY",
             "rate_to_eur": 178.253168,
-            "timestamp": 1731196800,
+            "timestamp": current_timestamp,
         },
         {
             "date": date.today().isoformat(),
             "currency": "CHF",
             "rate_to_eur": 0.932214,
-            "timestamp": 1731196800,
+            "timestamp": current_timestamp,
         },
     ]
     
     print(f"Inserting {len(test_records)} test records for {date.today()}...")
-    print(f"Currencies: {[r['currency'] for r in test_records]}\n")
+    print(f"Currencies: {[r['currency'] for r in test_records]}")
+    print(f"Timestamp: {current_timestamp}\n")
     
     # Upsert to BigQuery
     upsert_exchange_rates(test_records)
@@ -68,19 +77,21 @@ def test_bq_upsert():
     """Test upsert behavior - updating existing records."""
     print("\n=== Testing BigQuery Upsert (Update) ===\n")
     
+    current_timestamp = int(time.time())  # Get current Unix timestamp
+    
     # Insert same records with different rates
     updated_records = [
         {
             "date": date.today().isoformat(),
             "currency": "USD",
             "rate_to_eur": 1.160000,  # Updated rate
-            "timestamp": 1731200000,
+            "timestamp": current_timestamp,
         },
         {
             "date": date.today().isoformat(),
             "currency": "GBP",
             "rate_to_eur": 0.880000,  # Updated rate
-            "timestamp": 1731200000,
+            "timestamp": current_timestamp,
         },
     ]
     
