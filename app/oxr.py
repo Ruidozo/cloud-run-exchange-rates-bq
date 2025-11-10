@@ -1,5 +1,3 @@
-"""Open Exchange Rates API client."""
-
 import logging
 import os
 import time
