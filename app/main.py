@@ -6,6 +6,7 @@ from typing import Any, Dict, List
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 
+from app.bq import upsert_exchange_rates
 from app.converter import convert_usd_to_eur_base
 from app.oxr import fetch_historical_rates
 
@@ -17,8 +18,8 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Currency Exchange Rates Service")
 
-# Currencies to track (in addition to EUR which is the base)
-TRACKED_CURRENCIES = {"USD", "GBP", "JPY", "CHF", "EUR"}
+# Currencies to track
+TRACKED_CURRENCIES = {"USD", "GBP", "JPY", "CHF"}
 
 
 @app.get("/health")
@@ -43,19 +44,23 @@ async def ingest_exchange_rates():
     """
     Ingest exchange rates for the last 30 days.
     
-    Fetches USD-based rates from Open Exchange Rates API,
-    converts them to EUR base, and builds records for BigQuery.
-    Only includes USD, GBP, JPY, CHF, and EUR.
+    Full pipeline:
+    1. Fetch USD-based rates from Open Exchange Rates API (30 days)
+    2. Convert all rates to EUR base
+    3. Filter to tracked currencies (USD, GBP, JPY, CHF)
+    4. Upsert records to BigQuery using staging table pattern
+    
+    Returns summary of ingestion results.
     """
     try:
         records: List[Dict[str, Any]] = []
         end_date = date.today()
-        start_date = end_date - timedelta(days=29)  # 30 days total including today
+        start_date = end_date - timedelta(days=29)
         
         logger.info("Starting ingestion from %s to %s", start_date, end_date)
         logger.info("Tracking currencies: %s", TRACKED_CURRENCIES)
         
-        # Loop through last 30 days
+        # Step 1 & 2: Fetch and convert rates for last 30 days
         current_date = start_date
         while current_date <= end_date:
             logger.info("Processing date: %s", current_date)
@@ -66,7 +71,7 @@ async def ingest_exchange_rates():
             # Convert to EUR base
             eur_rates = convert_usd_to_eur_base(oxr_data)
             
-            # Build records only for tracked currencies
+            # Step 3: Build records only for tracked currencies 
             for currency, rate in eur_rates.items():
                 if currency in TRACKED_CURRENCIES:
                     record = {
@@ -85,7 +90,10 @@ async def ingest_exchange_rates():
         
         logger.info("Successfully built %d records for 30 days", len(records))
         
-        # TODO: Insert records into BigQuery
+        # Step 4: Upsert records to BigQuery
+        logger.info("Upserting %d records to BigQuery", len(records))
+        upsert_exchange_rates(records)
+        logger.info("BigQuery upsert completed successfully")
         
         return {
             "status": "success",
@@ -96,7 +104,8 @@ async def ingest_exchange_rates():
                 "end": end_date.isoformat(),
             },
             "currencies_per_day": len(TRACKED_CURRENCIES),
-            "sample_records": records[:5] if records else [],
+            "bigquery_dataset": "exchange_rates",
+            "bigquery_table": "rates",
         }
         
     except Exception as e:
