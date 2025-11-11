@@ -1,33 +1,32 @@
 # Exchange Rates Pipeline - Cloud Run to BigQuery
 
-A serverless data pipeline that fetches daily exchange rates from Open Exchange Rates API and stores them in Google BigQuery using Cloud Run.
+A simple serverless pipeline that fetches daily exchange rates from Open Exchange Rates API and stores them in BigQuery.
 
 ## Quick Start
 
 ### Prerequisites
 - Python 3.11+
 - Google Cloud SDK
-- Docker
-- GCP account with billing enabled
-- Open Exchange Rates API key
+- GCP project with billing enabled
+- Open Exchange Rates API key (free tier)
 
 ### Setup
 
 ```bash
-# Clone and setup
-git clone https://github.com/Ruidozo/cloud-run-exchange-rates-bq.git
+# Clone
+git clone <repo-url>
 cd cloud-run-exchange-rates-bq
 
-# Create virtual environment
+# Virtual environment
 python3 -m venv venv
 source venv/bin/activate
 
-# Install dependencies
+# Install
 pip install -r requirements.txt
 
-# Set environment variables
-export PROJECT_ID=your-gcp-project-id
-export OXR_APP_ID=your-openexchangerates-api-key
+# Environment variables
+export PROJECT_ID=your-gcp-project
+export OXR_APP_ID=your-api-key
 export REGION=europe-west1
 
 # Authenticate
@@ -35,163 +34,60 @@ gcloud auth login
 gcloud config set project ${PROJECT_ID}
 gcloud auth application-default login
 
-# Create BigQuery dataset and table
+# BigQuery setup
 bq mk --dataset ${PROJECT_ID}:exchange_rates
 
 bq mk --table \
   --time_partitioning_field date \
-  --time_partitioning_type DAY \
   ${PROJECT_ID}:exchange_rates.rates \
   date:DATE,currency:STRING,rate_to_eur:FLOAT64,timestamp:TIMESTAMP
 ```
 
-## Deployment
+## How to Trigger
 
-### Deploy to Cloud Run
-
+### Local Testing
 ```bash
-# Enable APIs
-gcloud services enable run.googleapis.com cloudbuild.googleapis.com
+# Start server
+uvicorn app.main:app --reload --port 8080
 
-# Deploy from source
+# Trigger ingest
+curl -X POST http://localhost:8080/ingest
+
+# Health check
+curl http://localhost:8080/health
+```
+
+### Cloud Run
+```bash
+# Deploy
 gcloud run deploy exchange-rates-pipeline \
   --source . \
   --region ${REGION} \
   --platform managed \
   --allow-unauthenticated \
-  --set-env-vars PROJECT_ID=${PROJECT_ID},OXR_APP_ID=${OXR_APP_ID} \
-  --memory 512Mi \
-  --timeout 300s \
-  --max-instances 1
+  --set-env-vars PROJECT_ID=${PROJECT_ID},OXR_APP_ID=${OXR_APP_ID}
 
-# Get service URL
+# Get URL
 SERVICE_URL=$(gcloud run services describe exchange-rates-pipeline \
-  --region ${REGION} \
-  --format 'value(status.url)')
+  --region ${REGION} --format 'value(status.url)')
 
-echo "Service deployed at: $SERVICE_URL"
+# Trigger
+curl -X POST ${SERVICE_URL}/ingest
 ```
 
-## Usage
-
-### Local Development
-
-```bash
-# Start server
-uvicorn app.main:app --reload --port 8080
-
-# Test endpoints
-curl http://localhost:8080/health
-curl -X POST http://localhost:8080/ingest
-```
-
-### API Endpoints
-
-- `GET /health` - Health check
-- `POST /ingest` - Trigger exchange rate ingestion (last 30 days)
-
-**Example Response:**
-```json
-{
-  "status": "success",
-  "records_ingested": 120,
-  "failed_dates": []
-}
-```
-
-## Testing
-
-```bash
-# Run all tests with coverage
-python -m pytest tests/ -v --cov=app --cov-report=term-missing
-
-# Run specific test suite
-python -m pytest tests/test_converter.py -v
-python -m pytest tests/test_edge_cases.py -v
-
-# Integration tests
-python -m tests.test_bq
-python -m tests.validation_test
-```
-
-## Project Structure
-
-```
-cloud-run-exchange-rates-bq/
-├── app/
-│   ├── main.py              # FastAPI application
-│   ├── oxr.py               # Open Exchange Rates API client
-│   ├── converter.py         # Currency conversion logic
-│   └── bq.py                # BigQuery operations
-├── tests/                   # Unit & integration tests
-├── Dockerfile
-├── requirements.txt
-├── README.md
-└── DEMO.md                  # Detailed demo commands
-```
-
-## Features
-
-- Fetches last 30 days of historical exchange rates
-- Converts USD-based rates to EUR-based rates
-- Idempotent upserts to BigQuery (no duplicates)
-- Comprehensive error handling and logging
-- Type-safe Python with full type hints
-- Containerized deployment on Cloud Run
-
-## Architecture
-
-```
-Cloud Scheduler (optional)
-        ↓
-  Cloud Run (FastAPI)
-        ↓
-  Open Exchange Rates API
-        ↓
-  BigQuery (exchange_rates dataset)
-```
-
-**Data Flow:**
-1. `/ingest` endpoint triggered
-2. Fetch last 30 days from Open Exchange Rates API
-3. Convert USD rates to EUR base
-4. Load to staging table
-5. MERGE to main table (upsert)
-
-## Configuration
-
-### Tracked Currencies
-- USD, GBP, JPY, CHF (against EUR)
-
-### Partitioning
-- Date-based partitioning for performance
-
-### Environment Variables
-```bash
-PROJECT_ID          # GCP project ID
-OXR_APP_ID          # Open Exchange Rates API key
-REGION              # GCP region (default: europe-west1)
-```
-
-## Cloud Scheduler (Optional)
-
-Automate daily runs:
-
+### Schedule with Cloud Scheduler (Optional)
 ```bash
 # Create service account
 gcloud iam service-accounts create exchange-rates-scheduler \
   --display-name "Exchange Rates Scheduler"
 
-# Grant Cloud Run Invoker role
+# Grant invoker role
 gcloud run services add-iam-policy-binding exchange-rates-pipeline \
   --region ${REGION} \
   --member serviceAccount:exchange-rates-scheduler@${PROJECT_ID}.iam.gserviceaccount.com \
   --role roles/run.invoker
 
-# Create job (daily at 6 AM UTC)
-SERVICE_URL=$(gcloud run services describe exchange-rates-pipeline \
-  --region ${REGION} --format 'value(status.url)')
-
+# Daily job (6 AM UTC)
 gcloud scheduler jobs create http exchange-rates-daily \
   --location ${REGION} \
   --schedule "0 6 * * *" \
@@ -201,72 +97,98 @@ gcloud scheduler jobs create http exchange-rates-daily \
   --oidc-token-audience "${SERVICE_URL}"
 ```
 
+## Design Choices
+
+### Upsert Logic (No Duplicates)
+- Uses BigQuery MERGE statement
+- Same date + currency = UPDATE existing row
+- New date + currency = INSERT new row
+- Safe to run multiple times
+
+### EUR Conversion
+- Open Exchange Rates API returns USD base rates
+- We divide by EUR rate to convert to EUR base
+- Formula: `rate_to_eur = usd_rate / eur_rate`
+
+### Error Handling
+- Missing API key: Returns 500 error on startup
+- API failures: Logs error and continues with other dates
+- Network timeouts: Retried up to 3 times automatically
+- Graceful degradation: Partial data is still upserted
+
+### Architecture
+```
+POST /ingest
+    ↓
+Fetch last 30 days from OXR API
+    ↓
+Convert USD rates to EUR base
+    ↓
+MERGE into BigQuery (upsert)
+    ↓
+Return success/failure count
+```
+
+## Running Tests
+
+```bash
+# All tests
+pytest tests/ -v
+
+# Specific test
+pytest tests/test_ingest.py::TestEURConversion -v
+
+# With coverage
+pytest tests/ --cov=app
+```
+
+## Limitations
+
+- **Free tier only:** Historical data limited to recent dates
+- **Base currency fixed:** EUR is hardcoded (could be parameterized)
+- **Tracked currencies:** USD, GBP, JPY, CHF only (configurable via environment)
+- **Daily frequency:** Not real-time, designed for daily runs
+- **Rate limits:** Subject to OXR API rate limits per subscription tier
+- **Timestamp:** Uses OXR API timestamp, not fetch time
+
+## Known Issues & Future Ideas
+
+- [ ] Support configurable base currency
+- [ ] Add data quality validation (check for outliers)
+- [ ] Export to CSV for audit trail
+- [ ] Email alerts on API failures
+- [ ] Dashboard in Looker Studio
+- [ ] Performance: Batch API calls if needed
+
 ## Monitoring
 
 ```bash
 # View logs
 gcloud run services logs read exchange-rates-pipeline \
-  --region ${REGION} \
-  --limit 50
+  --region ${REGION} --limit 50
 
-# List revisions
-gcloud run revisions list \
-  --service exchange-rates-pipeline \
-  --region ${REGION}
-
-# Query BigQuery
+# Check data in BigQuery
 bq query --use_legacy_sql=false \
-"SELECT currency, COUNT(*) as records \
- FROM \`${PROJECT_ID}.exchange_rates.rates\` \
- GROUP BY currency"
+"SELECT date, currency, rate_to_eur 
+ FROM \`${PROJECT_ID}.exchange_rates.rates\`
+ ORDER BY date DESC, currency
+ LIMIT 100"
+
+# Count records by date
+bq query --use_legacy_sql=false \
+"SELECT date, COUNT(*) as count
+ FROM \`${PROJECT_ID}.exchange_rates.rates\`
+ GROUP BY date ORDER BY date DESC"
 ```
-
-## Limitations
-
-- **Historical Data**: Free tier limited to recent data; paid plans offer more history
-- **Currencies**: Currently tracking USD, GBP, JPY, CHF (configurable)
-- **BigQuery Quotas**: Subject to GCP project quotas and billing limits
-- **Real-time**: Data updated daily, not real-time
-- **Base Currency**: EUR is hardcoded as base currency
-- **Timezone**: All timestamps in UTC
-
-## Future Improvements
-
-- [ ] Support for additional base currencies
-- [ ] Configurable tracked currencies via environment variables
-- [ ] Database connection pooling optimization
-- [ ] Advanced metrics and alerting
-- [ ] Multi-region deployment support
 
 ## Troubleshooting
 
-### Authentication Error
-```bash
-gcloud auth application-default login
-```
-
-### BigQuery Table Not Found
-```bash
-bq mk --table \
-  --time_partitioning_field date \
-  ${PROJECT_ID}:exchange_rates.rates \
-  date:DATE,currency:STRING,rate_to_eur:FLOAT64,timestamp:TIMESTAMP
-```
-
-### Cloud Run Deployment Failed
-```bash
-# Check logs
-gcloud run services logs read exchange-rates-pipeline --region ${REGION}
-
-# Verify environment variables
-gcloud run services describe exchange-rates-pipeline --region ${REGION}
-```
-
-### Invalid API Key
-```bash
-# Test API key
-curl "https://openexchangerates.org/api/latest.json?app_id=${OXR_APP_ID}"
-```
+| Issue | Solution |
+|-------|----------|
+| `401 Unauthorized` | Check `OXR_APP_ID` is set and valid |
+| `Table not found` | Run `bq mk` command from Setup section |
+| `Deployment failed` | Check logs: `gcloud run services logs read exchange-rates-pipeline --region ${REGION}` |
+| `No data in BigQuery` | Verify API key works: `curl "https://openexchangerates.org/api/latest.json?app_id=${OXR_APP_ID}"` |
 
 ## Cleanup
 
@@ -278,11 +200,6 @@ gcloud run services delete exchange-rates-pipeline --region ${REGION}
 bq rm -f -t ${PROJECT_ID}:exchange_rates.rates
 bq rm -f -t ${PROJECT_ID}:exchange_rates.rates_staging
 ```
-
-## More Information
-
-- See `DEMO.md` for detailed demo commands
-- See `DEPLOY.md` for deployment guide
 
 ---
 

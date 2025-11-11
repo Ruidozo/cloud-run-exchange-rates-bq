@@ -1,34 +1,31 @@
-# Deployment Guide - Updated Version with INTEGER Timestamp
+# Deployment Guide
 
-This guide walks you through redeploying the updated application to Google Cloud Run.
-
-## Prerequisites
-
-Ensure you have:
-- Google Cloud SDK installed and authenticated
-- Project ID and OXR_APP_ID environment variables set
-- Necessary permissions on GCP project
-
-## Step 1: Set Environment Variables
+## Step 1: Prerequisites
 
 ```bash
-export PROJECT_ID=rui-case  
-export OXR_APP_ID=your-openexchangerates-api-key
-export REGION=europe-west1
+# Verify installed
+gcloud --version
+docker --version
+python3 --version
+
+# Authenticate
+gcloud auth login
+gcloud auth application-default login
+
+# Set project
+export PROJECT_ID=your-gcp-project-id
+gcloud config set project ${PROJECT_ID}
 ```
 
-## Step 2: Clean Up Existing BigQuery Tables
-
-The schema uses TIMESTAMP type for the timestamp field:
+## Step 2: BigQuery Setup
 
 ```bash
-# Drop existing staging table (it will be recreated automatically)
-bq rm -f -t ${PROJECT_ID}:exchange_rates.rates_staging
+export REGION=europe-west1
 
-# Drop and recreate main table with TIMESTAMP type
-bq rm -f -t ${PROJECT_ID}:exchange_rates.rates
+# Create dataset
+bq mk --dataset ${PROJECT_ID}:exchange_rates
 
-# Create main table with TIMESTAMP
+# Create table with partitioning
 bq mk --table \
   --time_partitioning_field date \
   --time_partitioning_type DAY \
@@ -36,17 +33,21 @@ bq mk --table \
   date:DATE,currency:STRING,rate_to_eur:FLOAT64,timestamp:TIMESTAMP
 ```
 
-## Step 3: Build and Deploy to Cloud Run
-
-### Option A: Deploy from Source (Recommended)
-
-This automatically builds the Docker image using Cloud Build:
+## Step 3: Environment Variables
 
 ```bash
-# Navigate to project directory
-cd /Users/ruicarvalho/Desktop/projects/use_case_klevie/cloud-run-exchange-rates-bq
+export PROJECT_ID=your-gcp-project-id
+export OXR_APP_ID=your-openexchangerates-api-key
+export REGION=europe-west1
+```
 
-# Deploy to Cloud Run
+## Step 4: Deploy to Cloud Run
+
+```bash
+# Enable APIs
+gcloud services enable run.googleapis.com cloudbuild.googleapis.com
+
+# Deploy from source
 gcloud run deploy exchange-rates-pipeline \
   --source . \
   --region ${REGION} \
@@ -55,218 +56,75 @@ gcloud run deploy exchange-rates-pipeline \
   --set-env-vars PROJECT_ID=${PROJECT_ID},OXR_APP_ID=${OXR_APP_ID} \
   --memory 512Mi \
   --timeout 300s \
-  --max-instances 1 \
-  --project ${PROJECT_ID}
-```
+  --max-instances 1
 
-### Option B: Build Docker Image Manually
-
-If you prefer more control over the build process:
-
-```bash
-# Navigate to project directory
-cd /Users/ruicarvalho/Desktop/projects/use_case_klevie/cloud-run-exchange-rates-bq
-
-# Enable required APIs (if not already enabled)
-gcloud services enable cloudbuild.googleapis.com
-gcloud services enable run.googleapis.com
-gcloud services enable containerregistry.googleapis.com
-
-# Build Docker image
-docker build -t gcr.io/${PROJECT_ID}/exchange-rates-pipeline:latest .
-
-# Push to Google Container Registry
-docker push gcr.io/${PROJECT_ID}/exchange-rates-pipeline:latest
-
-# Deploy to Cloud Run
-gcloud run deploy exchange-rates-pipeline \
-  --image gcr.io/${PROJECT_ID}/exchange-rates-pipeline:latest \
-  --region ${REGION} \
-  --platform managed \
-  --allow-unauthenticated \
-  --set-env-vars PROJECT_ID=${PROJECT_ID},OXR_APP_ID=${OXR_APP_ID} \
-  --memory 512Mi \
-  --timeout 300s \
-  --max-instances 1 \
-  --project ${PROJECT_ID}
-```
-
-## Step 4: Get Service URL
-
-```bash
+# Save URL
 SERVICE_URL=$(gcloud run services describe exchange-rates-pipeline \
   --region ${REGION} \
-  --platform managed \
-  --project ${PROJECT_ID} \
   --format 'value(status.url)')
 
-echo "Service deployed at: $SERVICE_URL"
+echo "Deployed to: ${SERVICE_URL}"
 ```
 
-## Step 5: Test the Deployment
-
-### Test Health Endpoint
+## Step 5: Test
 
 ```bash
+# Health check
 curl ${SERVICE_URL}/health
-```
 
-Expected response:
-```json
-{"status":"ok"}
-```
-
-### Test Ingest Endpoint
-
-```bash
+# Trigger ingest
 curl -X POST ${SERVICE_URL}/ingest
-```
 
-Expected response:
-```json
-{
-  "status": "success",
-  "records_count": 120,
-  "date_range": {
-    "start": "2025-10-12",
-    "end": "2025-11-10"
-  }
-}
-```
-
-## Step 6: Verify Data in BigQuery
-
-```bash
-# Check record count
-bq query --use_legacy_sql=false \
-  "SELECT COUNT(*) as count FROM \`${PROJECT_ID}.exchange_rates.rates\`"
-
-# Check today's data
-bq query --use_legacy_sql=false \
-  "SELECT * FROM \`${PROJECT_ID}.exchange_rates.rates\` 
-   WHERE date = CURRENT_DATE() 
-   ORDER BY currency"
-
-# Check timestamp field type
-bq show --schema --format=prettyjson \
-  ${PROJECT_ID}:exchange_rates.rates | grep -A 2 timestamp
-```
-
-Expected schema for timestamp:
-```json
-{
-  "mode": "REQUIRED",
-  "name": "timestamp",
-  "type": "TIMESTAMP"
-}
-```
-
-## Step 7: Monitor Logs
-
-```bash
-# View recent logs
+# View logs
 gcloud run services logs read exchange-rates-pipeline \
-  --region ${REGION} \
-  --project ${PROJECT_ID} \
-  --limit 100
-
-# Tail logs in real-time
-gcloud run services logs tail exchange-rates-pipeline \
-  --region ${REGION} \
-  --project ${PROJECT_ID}
+  --region ${REGION} --limit 50
 ```
 
-## Rollback (if needed)
+## Step 6: Automate (Optional)
 
-If you need to rollback to a previous version:
+Schedule daily runs with Cloud Scheduler:
 
 ```bash
-# List revisions
-gcloud run revisions list \
-  --service exchange-rates-pipeline \
-  --region ${REGION} \
-  --project ${PROJECT_ID}
+# Create service account
+gcloud iam service-accounts create exchange-rates-scheduler \
+  --display-name "Exchange Rates Scheduler"
 
-# Rollback to a specific revision
-gcloud run services update-traffic exchange-rates-pipeline \
-  --to-revisions REVISION_NAME=100 \
+# Grant permission to invoke Cloud Run
+gcloud run services add-iam-policy-binding exchange-rates-pipeline \
   --region ${REGION} \
-  --project ${PROJECT_ID}
+  --member serviceAccount:exchange-rates-scheduler@${PROJECT_ID}.iam.gserviceaccount.com \
+  --role roles/run.invoker
+
+# Create daily job (6 AM UTC)
+gcloud scheduler jobs create http exchange-rates-daily \
+  --location ${REGION} \
+  --schedule "0 6 * * *" \
+  --uri "${SERVICE_URL}/ingest" \
+  --http-method POST \
+  --oidc-service-account-email exchange-rates-scheduler@${PROJECT_ID}.iam.gserviceaccount.com \
+  --oidc-token-audience "${SERVICE_URL}"
+
+# Verify job created
+gcloud scheduler jobs list --location ${REGION}
 ```
 
-## Troubleshooting
-
-### Issue: Schema mismatch error
-
-If you see errors about schema mismatch:
+## Cleanup
 
 ```bash
-# Drop both tables and recreate
-bq rm -f -t ${PROJECT_ID}:exchange_rates.rates_staging
+# Delete scheduler job
+gcloud scheduler jobs delete exchange-rates-daily --location ${REGION}
+
+# Delete service account
+gcloud iam service-accounts delete exchange-rates-scheduler@${PROJECT_ID}.iam.gserviceaccount.com
+
+# Delete Cloud Run service
+gcloud run services delete exchange-rates-pipeline --region ${REGION}
+
+# Delete BigQuery tables
 bq rm -f -t ${PROJECT_ID}:exchange_rates.rates
-
-# Recreate main table
-bq mk --table \
-  --time_partitioning_field date \
-  --time_partitioning_type DAY \
-  ${PROJECT_ID}:exchange_rates.rates \
-  date:DATE,currency:STRING,rate_to_eur:FLOAT64,timestamp:TIMESTAMP
-
-# The staging table will be created automatically on first run
-```
-
-### Issue: Deployment fails
-
-```bash
-# Check Cloud Build logs
-gcloud builds list --limit=5 --project ${PROJECT_ID}
-
-# Get detailed build logs
-gcloud builds log BUILD_ID --project ${PROJECT_ID}
-```
-
-### Issue: Service not responding
-
-```bash
-# Check service status
-gcloud run services describe exchange-rates-pipeline \
-  --region ${REGION} \
-  --project ${PROJECT_ID}
-
-# Check container logs for startup errors
-gcloud run services logs read exchange-rates-pipeline \
-  --region ${REGION} \
-  --project ${PROJECT_ID} \
-  --limit 50
-```
-
-## Post-Deployment Checklist
-
-- [ ] Service is running (check Cloud Run console)
-- [ ] Health endpoint returns 200 OK
-- [ ] Ingest endpoint successfully processes data
-- [ ] BigQuery tables have correct schema (INTEGER timestamp)
-- [ ] Data is being inserted correctly
-- [ ] No errors in Cloud Run logs
-- [ ] Environment variables are set correctly
-
-## Clean Up Old Revisions (Optional)
-
-To save storage costs, you can delete old revisions:
-
-```bash
-# List all revisions
-gcloud run revisions list \
-  --service exchange-rates-pipeline \
-  --region ${REGION} \
-  --project ${PROJECT_ID}
-
-# Delete a specific revision
-gcloud run revisions delete REVISION_NAME \
-  --region ${REGION} \
-  --project ${PROJECT_ID}
+bq rm -f -d ${PROJECT_ID}:exchange_rates
 ```
 
 ---
 
-**Deployment completed!** Your updated application with INTEGER timestamp is now running on Google Cloud Run.
+**Last Updated:** November 11, 2025
