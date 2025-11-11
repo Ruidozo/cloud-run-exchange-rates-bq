@@ -27,8 +27,8 @@ def test_bq_insert():
 
     from datetime import datetime, timezone
 
-    # Use Unix timestamp (integer)
-    current_timestamp = int(datetime.now(timezone.utc).timestamp())
+    # Use ISO format timestamp string for TIMESTAMP type
+    current_timestamp = datetime.now(timezone.utc).isoformat()
 
     # Create sample records
     test_records = [
@@ -85,8 +85,8 @@ def test_bq_upsert():
 
     from datetime import datetime, timezone
 
-    # Use Unix timestamp (integer)
-    current_timestamp = int(datetime.now(timezone.utc).timestamp())
+    # Use ISO format timestamp string for TIMESTAMP type
+    current_timestamp = datetime.now(timezone.utc).isoformat()
 
     # Insert same records with different rates
     updated_records = [
@@ -182,25 +182,24 @@ def test_dataset(bq_client):
 def sample_records():
     """Sample records for testing."""
     now = datetime.now(timezone.utc)
-    timestamp = int(now.timestamp())
     return [
         {
             "date": "2025-11-10",
             "currency": "USD",
             "rate_to_eur": 1.0869565217391304,
-            "timestamp": timestamp,
+            "timestamp": now.isoformat(),
         },
         {
             "date": "2025-11-10",
             "currency": "GBP",
             "rate_to_eur": 0.8804347826086956,
-            "timestamp": timestamp,
+            "timestamp": now.isoformat(),
         },
         {
             "date": "2025-11-10",
             "currency": "JPY",
             "rate_to_eur": 163.04347826086956,
-            "timestamp": timestamp,
+            "timestamp": now.isoformat(),
         },
     ]
 
@@ -241,7 +240,7 @@ class TestBigQueryOperations:
         assert schema_fields["date"] == "DATE"
         assert schema_fields["currency"] == "STRING"
         assert schema_fields["rate_to_eur"] == "FLOAT"
-        assert schema_fields["timestamp"] == "INTEGER"
+        assert schema_fields["timestamp"] == "TIMESTAMP"
     
     def test_ensure_staging_table_exists(self, bq_client, test_dataset):
         """Test that existing table is not recreated."""
@@ -265,7 +264,7 @@ class TestBigQueryOperations:
             bigquery.SchemaField("date", "DATE", mode="REQUIRED"),
             bigquery.SchemaField("currency", "STRING", mode="REQUIRED"),
             bigquery.SchemaField("rate_to_eur", "FLOAT64", mode="REQUIRED"),
-            bigquery.SchemaField("timestamp", "INTEGER", mode="REQUIRED"),
+            bigquery.SchemaField("timestamp", "TIMESTAMP", mode="REQUIRED"),
         ]
         table = bigquery.Table(table_id, schema=schema)
         bq_client.create_table(table, exists_ok=True)
@@ -353,7 +352,7 @@ class TestBigQueryEdgeCases:
                 "date": "2025-11-10",
                 "currency": "US$",  # Special character
                 "rate_to_eur": 1.08,
-                "timestamp": int(datetime.now(timezone.utc).timestamp()),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
             }
         ]
         

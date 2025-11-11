@@ -188,7 +188,7 @@ bq mk --table \
   --time_partitioning_field date \
   --time_partitioning_type DAY \
   ${PROJECT_ID}:exchange_rates.rates \
-  date:DATE,currency:STRING,rate_to_eur:FLOAT64,timestamp:INTEGER
+  date:DATE,currency:STRING,rate_to_eur:FLOAT64,timestamp:TIMESTAMP
 ```
 
 Note: The staging table `rates_staging` is created automatically by the application.
@@ -627,7 +627,7 @@ gcloud auth application-default login
 bq mk --table \
   --time_partitioning_field date \
   ${PROJECT_ID}:exchange_rates.rates \
-  date:DATE,currency:STRING,rate_to_eur:FLOAT64,timestamp:INTEGER
+  date:DATE,currency:STRING,rate_to_eur:FLOAT64,timestamp:TIMESTAMP
 ```
 
 #### 3. Cloud Run Deployment Fails

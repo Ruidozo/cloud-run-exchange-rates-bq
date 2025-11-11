@@ -53,31 +53,30 @@ def expected_eur_rates() -> Dict[str, float]:
 @pytest.fixture
 def sample_bq_records(sample_timestamp):
     """Sample BigQuery records for testing."""
-    timestamp = int(sample_timestamp.timestamp())
     return [
         {
             "date": "2025-11-10",
             "currency": "USD",
             "rate_to_eur": 1.0869565217391304,
-            "timestamp": timestamp,
+            "timestamp": sample_timestamp.isoformat(),
         },
         {
             "date": "2025-11-10",
             "currency": "GBP",
             "rate_to_eur": 0.8804347826086956,
-            "timestamp": timestamp,
+            "timestamp": sample_timestamp.isoformat(),
         },
         {
             "date": "2025-11-10",
             "currency": "JPY",
             "rate_to_eur": 163.04347826086956,
-            "timestamp": timestamp,
+            "timestamp": sample_timestamp.isoformat(),
         },
         {
             "date": "2025-11-10",
             "currency": "CHF",
             "rate_to_eur": 0.9565217391304348,
-            "timestamp": timestamp,
+            "timestamp": sample_timestamp.isoformat(),
         },
     ]
 

@@ -162,8 +162,8 @@ class TestBigQueryIntegration:
         # Convert
         eur_rates = convert_usd_to_eur_base(oxr_data)
         
-        # Prepare records with Unix timestamp (integer)
-        timestamp = int(datetime.now(timezone.utc).timestamp())
+        # Prepare records with ISO format timestamp
+        timestamp = datetime.now(timezone.utc).isoformat()
         records = []
         
         for currency in ["USD", "GBP", "JPY", "CHF"]:

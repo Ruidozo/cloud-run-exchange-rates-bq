@@ -6,7 +6,7 @@
 
 import logging
 import os
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, Dict, List
 
 from dotenv import load_dotenv
@@ -63,8 +63,8 @@ def ingest_exchange_rates():
             oxr_data = fetch_historical_rates(current_date)
             eur_rates = convert_usd_to_eur_base(oxr_data)
             
-            # Use Unix timestamp (integer) instead of ISO string
-            timestamp = int(datetime.now().timestamp())
+            # Use ISO format timestamp string for TIMESTAMP type
+            timestamp = datetime.now(timezone.utc).isoformat()
             
             for currency in TRACKED_CURRENCIES:
                 if currency in eur_rates:

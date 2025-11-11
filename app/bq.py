@@ -41,7 +41,7 @@ def ensure_staging_table(
         bigquery.SchemaField("date", "DATE", mode="REQUIRED"),
         bigquery.SchemaField("currency", "STRING", mode="REQUIRED"),
         bigquery.SchemaField("rate_to_eur", "FLOAT64", mode="REQUIRED"),
-        bigquery.SchemaField("timestamp", "INTEGER", mode="REQUIRED"),
+        bigquery.SchemaField("timestamp", "TIMESTAMP", mode="REQUIRED"),
     ]
     
     table = bigquery.Table(table_id, schema=schema)
@@ -53,7 +53,7 @@ def ensure_staging_table(
         
         # Check if schema matches, if not, drop and recreate
         existing_schema = {field.name: field.field_type for field in existing_table.schema}
-        if existing_schema.get("timestamp") != "INTEGER":
+        if existing_schema.get("timestamp") not in ["TIMESTAMP", "INTEGER"]:
             logger.warning(f"Schema mismatch for timestamp field, dropping and recreating table")
             client.delete_table(table_id)
             client.create_table(table)
@@ -98,7 +98,7 @@ def load_to_staging(client: bigquery.Client, table_ref: str, records: List[Dict[
             bigquery.SchemaField("date", "DATE", mode="REQUIRED"),
             bigquery.SchemaField("currency", "STRING", mode="REQUIRED"),
             bigquery.SchemaField("rate_to_eur", "FLOAT64", mode="REQUIRED"),
-            bigquery.SchemaField("timestamp", "INTEGER", mode="NULLABLE"),
+            bigquery.SchemaField("timestamp", "TIMESTAMP", mode="REQUIRED"),
         ],
         write_disposition=bigquery.WriteDisposition.WRITE_APPEND,
     )
@@ -183,13 +183,13 @@ def upsert_exchange_rates(
         client.query(truncate_query).result()
         logger.info(f"Truncated staging table: {staging_table_id_full}")
         
-        # Load records into staging - use INTEGER for timestamp
+        # Load records into staging - use TIMESTAMP type
         job_config = bigquery.LoadJobConfig(
             schema=[
                 bigquery.SchemaField("date", "DATE", mode="REQUIRED"),
                 bigquery.SchemaField("currency", "STRING", mode="REQUIRED"),
                 bigquery.SchemaField("rate_to_eur", "FLOAT64", mode="REQUIRED"),
-                bigquery.SchemaField("timestamp", "INTEGER", mode="REQUIRED"),
+                bigquery.SchemaField("timestamp", "TIMESTAMP", mode="REQUIRED"),
             ],
             write_disposition=bigquery.WriteDisposition.WRITE_APPEND,
         )
