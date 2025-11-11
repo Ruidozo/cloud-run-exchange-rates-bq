@@ -1,6 +1,6 @@
 import logging
 import os
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 import requests
 from dotenv import load_dotenv
@@ -56,7 +56,13 @@ def ingest():
                     continue
                 
                 usd_to_eur = 1 / eur_rate
-                timestamp = data.get("timestamp")
+                
+                # Convert Unix timestamp to ISO format string
+                timestamp_unix = data.get("timestamp")
+                if timestamp_unix:
+                    timestamp = datetime.utcfromtimestamp(timestamp_unix).isoformat() + "Z"
+                else:
+                    timestamp = datetime.utcnow().isoformat() + "Z"
                 
                 # Extract currencies: USD, GBP, JPY, CHF
                 for currency in ["USD", "GBP", "JPY", "CHF"]:
