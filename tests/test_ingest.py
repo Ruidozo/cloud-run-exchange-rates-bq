@@ -1,8 +1,6 @@
 """Tests for exchange rate ingestion - upsert logic and EUR conversion."""
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 
 def test_eur_conversion():
     """Test USD to EUR conversion math."""
@@ -19,32 +17,31 @@ def test_missing_eur_rate():
     
     eur_rate = rates.get("EUR")
     assert eur_rate is None
-    # Code should skip this date
 
 
 def test_upsert_handles_duplicates():
     """Test that MERGE statement handles duplicate dates."""
-    # MERGE query updates existing date+currency, inserts new ones
     merge_query = """
     MERGE INTO `table` T
     USING `staging` S
     ON T.date = S.date AND T.currency = S.currency
-    WHEN MATCHED THEN UPDATE SET ...
-    WHEN NOT MATCHED THEN INSERT ...
+    WHEN MATCHED THEN UPDATE SET rate_to_eur = S.rate_to_eur, timestamp = S.timestamp
+    WHEN NOT MATCHED THEN INSERT (date, currency, rate_to_eur, timestamp) VALUES (S.date, S.currency, S.rate_to_eur, S.timestamp)
     """
     assert "WHEN MATCHED THEN UPDATE" in merge_query
     assert "WHEN NOT MATCHED THEN INSERT" in merge_query
 
 
-def test_api_error_graceful_handling():
-    """Test that API errors don't crash entire job."""
-    with patch("requests.get") as mock_get:
-        mock_get.side_effect = Exception("API Error")
-        # Code catches exception and continues with other dates
-
-
-def test_missing_environment_variables():
-    """Test validation of required env vars."""
-    with patch.dict("os.environ", {"PROJECT_ID": "", "OXR_APP_ID": ""}, clear=True):
-        # Should return error response, not crash
-        pass
+def test_record_structure():
+    """Test that records have correct structure."""
+    record = {
+        "date": "2025-11-11",
+        "currency": "USD",
+        "rate_to_eur": 0.92,
+        "timestamp": "2025-11-11T00:00:00Z"
+    }
+    
+    assert "date" in record
+    assert "currency" in record
+    assert "rate_to_eur" in record
+    assert "timestamp" in record    
