@@ -15,7 +15,7 @@ A serverless data pipeline that fetches daily exchange rates from Open Exchange 
 
 ```bash
 # Clone and setup
-git clone [<repository-url>](https://github.com/Ruidozo/cloud-run-exchange-rates-bq.git)
+git clone https://github.com/Ruidozo/cloud-run-exchange-rates-bq.git
 cd cloud-run-exchange-rates-bq
 
 # Create virtual environment
@@ -223,7 +223,6 @@ bq query --use_legacy_sql=false \
 
 ## Limitations
 
-- **API Rate Limiting**: Open Exchange Rates API has rate limits based on subscription tier
 - **Historical Data**: Free tier limited to recent data; paid plans offer more history
 - **Currencies**: Currently tracking USD, GBP, JPY, CHF (configurable)
 - **BigQuery Quotas**: Subject to GCP project quotas and billing limits
@@ -238,11 +237,6 @@ bq query --use_legacy_sql=false \
 - [ ] Database connection pooling optimization
 - [ ] Advanced metrics and alerting
 - [ ] Multi-region deployment support
-- [ ] WebSocket support for real-time updates
-- [ ] Caching layer for frequently accessed rates
-- [ ] Data quality validation checks
-- [ ] Historical rate reconciliation
-- [ ] Cost optimization analysis
 
 ## Troubleshooting
 
