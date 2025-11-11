@@ -8,20 +8,22 @@ import os
 from typing import Any, Dict, List
 
 from google.cloud import bigquery
+from google.cloud.exceptions import NotFound
 
 logger = logging.getLogger(__name__)
 
-
 def get_client() -> bigquery.Client:
-    """Get BigQuery client."""
+    """Get authenticated BigQuery client."""
     project_id = os.getenv("PROJECT_ID")
     if not project_id:
         raise ValueError("PROJECT_ID environment variable not set")
-    
     return bigquery.Client(project=project_id)
 
-
-def ensure_staging_table(client: bigquery.Client, dataset_id: str, staging_table_id: str) -> str:
+def ensure_staging_table(
+    client: bigquery.Client,
+    dataset_id: str = "exchange_rates",
+    staging_table_id: str = "rates_staging",
+) -> str:
     """
     Ensure staging table exists with correct schema.
     
@@ -31,28 +33,37 @@ def ensure_staging_table(client: bigquery.Client, dataset_id: str, staging_table
         staging_table_id: Staging table ID
         
     Returns:
-        Full table reference
+        Full table ID string (project.dataset.table)
     """
-    table_ref = f"{client.project}.{dataset_id}.{staging_table_id}"
+    table_id = f"{client.project}.{dataset_id}.{staging_table_id}"
     
     schema = [
         bigquery.SchemaField("date", "DATE", mode="REQUIRED"),
         bigquery.SchemaField("currency", "STRING", mode="REQUIRED"),
         bigquery.SchemaField("rate_to_eur", "FLOAT64", mode="REQUIRED"),
-        bigquery.SchemaField("timestamp", "INTEGER", mode="NULLABLE"),
+        bigquery.SchemaField("timestamp", "INTEGER", mode="REQUIRED"),
     ]
     
-    # Check if table exists if not creates it
-    try:
-        client.get_table(table_ref)
-        logger.info("Staging table %s already exists", staging_table_id)
-    except Exception:
-
-        table = bigquery.Table(table_ref, schema=schema)
-        client.create_table(table)
-        logger.info("Created staging table %s", staging_table_id)
+    table = bigquery.Table(table_id, schema=schema)
     
-    return table_ref
+    try:
+        # Try to get existing table first
+        existing_table = client.get_table(table_id)
+        logger.info(f"Staging table {table_id} already exists")
+        
+        # Check if schema matches, if not, drop and recreate
+        existing_schema = {field.name: field.field_type for field in existing_table.schema}
+        if existing_schema.get("timestamp") != "INTEGER":
+            logger.warning(f"Schema mismatch for timestamp field, dropping and recreating table")
+            client.delete_table(table_id)
+            client.create_table(table)
+            logger.info(f"Recreated staging table {table_id} with correct schema")
+    except Exception:
+        # Table doesn't exist, create it
+        client.create_table(table, exists_ok=True)
+        logger.info(f"Created staging table {table_id}")
+    
+    return table_id
 
 
 def truncate_staging_table(client: bigquery.Client, dataset_id: str, staging_table_id: str) -> None:
@@ -165,13 +176,29 @@ def upsert_exchange_rates(
     
     try:
         # Ensure staging table exists
-        staging_ref = ensure_staging_table(client, dataset_id, staging_table_id)
+        staging_table_id_full = ensure_staging_table(client, dataset_id, staging_table_id)
         
         # Truncate staging table
-        truncate_staging_table(client, dataset_id, staging_table_id)
+        truncate_query = f"TRUNCATE TABLE `{staging_table_id_full}`"
+        client.query(truncate_query).result()
+        logger.info(f"Truncated staging table: {staging_table_id_full}")
         
-        # Load records into staging
-        load_to_staging(client, staging_ref, records)
+        # Load records into staging - use INTEGER for timestamp
+        job_config = bigquery.LoadJobConfig(
+            schema=[
+                bigquery.SchemaField("date", "DATE", mode="REQUIRED"),
+                bigquery.SchemaField("currency", "STRING", mode="REQUIRED"),
+                bigquery.SchemaField("rate_to_eur", "FLOAT64", mode="REQUIRED"),
+                bigquery.SchemaField("timestamp", "INTEGER", mode="REQUIRED"),
+            ],
+            write_disposition=bigquery.WriteDisposition.WRITE_APPEND,
+        )
+        
+        load_job = client.load_table_from_json(
+            records, staging_table_id_full, job_config=job_config
+        )
+        load_job.result()
+        logger.info("Loaded %d records into staging table", len(records))
         
         # Merge staging into main
         merge_staging_to_main(client, dataset_id, main_table_id, staging_table_id)

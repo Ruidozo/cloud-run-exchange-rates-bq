@@ -6,7 +6,7 @@
 
 import logging
 import os
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from typing import Any, Dict, List
 
 from dotenv import load_dotenv
@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 app = FastAPI(title="Currency Exchange Rates Service")
 
 # Currencies to track
-TRACKED_CURRENCIES = {"USD", "GBP", "JPY", "CHF"}
+TRACKED_CURRENCIES = {"USD", "GBP", "JPY", "CHF" }
 
 
 @app.get("/health")
@@ -46,74 +46,106 @@ def root():
 
 
 @app.post("/ingest")
-async def ingest_exchange_rates():
-    """
-    Ingest exchange rates for the last 30 days.
+def ingest_exchange_rates():
+    """Fetch and store exchange rates for the last 30 days."""
+    logger.info("Starting exchange rate ingestion")
     
-    Full pipeline:
-    1. Fetch USD-based rates from Open Exchange Rates API (30 days)
-    2. Convert all rates to EUR base
-    3. Filter to tracked currencies (USD, GBP, JPY, CHF)
-    4. Upsert records to BigQuery using staging table pattern
+    end_date = date.today()
+    start_date = end_date - timedelta(days=30)
+    current_date = start_date
     
-    Returns summary of ingestion results.
-    """
-    try:
-        records: List[Dict[str, Any]] = []
-        end_date = date.today()
-        start_date = end_date - timedelta(days=29)
-        
-        logger.info("Starting ingestion from %s to %s", start_date, end_date)
-        logger.info("Tracking currencies: %s", TRACKED_CURRENCIES)
-        
-        # Step 1 & 2: Fetch and convert rates for last 30 days
-        current_date = start_date
-        while current_date <= end_date:
+    all_records: List[Dict[str, Any]] = []
+    failed_dates: List[Dict[str, str]] = []
+    
+    while current_date <= end_date:
+        try:
             logger.info("Processing date: %s", current_date)
-            
-            # Fetch USD-based rates from Open Exchange Rates API
             oxr_data = fetch_historical_rates(current_date)
-            
-            # Convert to EUR base
             eur_rates = convert_usd_to_eur_base(oxr_data)
             
-            # Step 3: Build records only for tracked currencies 
-            for currency, rate in eur_rates.items():
-                if currency in TRACKED_CURRENCIES:
-                    record = {
+            # Use Unix timestamp (integer) instead of ISO string
+            timestamp = int(datetime.now().timestamp())
+            
+            for currency in TRACKED_CURRENCIES:
+                if currency in eur_rates:
+                    all_records.append({
                         "date": current_date.isoformat(),
                         "currency": currency,
-                        "rate_to_eur": rate,
-                        "timestamp": oxr_data.get("timestamp"),
-                    }
-                    records.append(record)
-            
-            tracked_count = sum(1 for c in eur_rates if c in TRACKED_CURRENCIES)
-            logger.info("Processed %d tracked currencies for %s", tracked_count, current_date)
-            
-            # Move to next day
-            current_date += timedelta(days=1)
+                        "rate_to_eur": eur_rates[currency],
+                        "timestamp": timestamp,
+                    })
+                else:
+                    logger.warning(
+                        "Currency %s not found in rates for %s",
+                        currency, current_date
+                    )
         
-        logger.info("Successfully built %d records for 30 days", len(records))
+        except Exception as e:
+            logger.error(
+                "Failed to process %s: %s",
+                current_date, str(e),
+                exc_info=True
+            )
+            failed_dates.append({
+                "date": current_date.isoformat(),
+                "error": str(e)
+            })
         
-        # Step 4: Upsert records to BigQuery
-        logger.info("Upserting %d records to BigQuery", len(records))
-        upsert_exchange_rates(records)
-        logger.info("BigQuery upsert completed successfully")
-        
-        return {
-            "status": "success",
-            "records_count": len(records),
-            "tracked_currencies": list(TRACKED_CURRENCIES),
-            "date_range": {
-                "start": start_date.isoformat(),
-                "end": end_date.isoformat(),
-            },
-            "currencies_per_day": len(TRACKED_CURRENCIES),
-            "bigquery_dataset": "exchange_rates",
-            "bigquery_table": "rates",
-        }
-        
-    except Exception as e:
-        logger.error("Ingestion failed: %s", str(e), exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Ingestion failed: {str(e)}")
+        current_date += timedelta(days=1)
+    
+    # Upsert successful records even if some dates failed
+    if all_records:
+        try:
+            upsert_exchange_rates(all_records)
+            logger.info("Successfully upserted %d records", len(all_records))
+        except Exception as e:
+            logger.error("Failed to upsert records: %s", e, exc_info=True)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to write to BigQuery: {str(e)}"
+            )
+    
+    # Build response
+    status = "completed_with_failures" if failed_dates else "success"
+    
+    response = {
+        "status": status,
+        "records_count": len(all_records),
+        "date_range": {
+            "start": start_date.isoformat(),
+            "end": end_date.isoformat(),
+        },
+    }
+    
+    if failed_dates:
+        response["failed_dates"] = failed_dates
+        response["failed_count"] = len(failed_dates)
+        logger.warning("Completed with %d failed dates", len(failed_dates))
+    else:
+        logger.info("Ingestion completed successfully")
+    
+    return response
+
+
+@app.on_event("startup")
+async def validate_environment():
+    """Validate required environment variables on startup."""
+    required_vars = {
+        "PROJECT_ID": "Google Cloud Project ID",
+        "OXR_APP_ID": "Open Exchange Rates API Key"
+    }
+    
+    missing = []
+    for var, description in required_vars.items():
+        value = os.getenv(var)
+        if not value:
+            missing.append(f"{var} ({description})")
+        else:
+            logger.info("Environment variable %s is configured", var)
+    
+    if missing:
+        error_msg = f"Missing required environment variables: {', '.join(missing)}"
+        logger.error(error_msg)
+        raise RuntimeError(error_msg)
+    
+    logger.info("Environment validation successful")

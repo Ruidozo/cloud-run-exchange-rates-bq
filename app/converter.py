@@ -4,6 +4,7 @@
 
 
 import logging
+import math
 from typing import Any, Dict
 
 logger = logging.getLogger(__name__)
@@ -35,6 +36,11 @@ def convert_usd_to_eur_base(oxr_data: Dict[str, Any]) -> Dict[str, float]:
 
     usd_rates = oxr_data["rates"]
 
+    # Validate that rates is a dictionary
+    if not isinstance(usd_rates, dict):
+        logger.error("Invalid rates type: expected dict, got %s", type(usd_rates).__name__)
+        raise TypeError(f"rates must be a dictionary, got {type(usd_rates).__name__}")
+
     # Check if rates is empty
     if not usd_rates:
         logger.error("Empty rates dictionary in API response")
@@ -57,6 +63,21 @@ def convert_usd_to_eur_base(oxr_data: Dict[str, Any]) -> Dict[str, float]:
     eur_rates = {}
 
     for currency, usd_rate in usd_rates.items():
+        # Skip None values
+        if usd_rate is None:
+            logger.warning("Skipping %s: rate is None", currency)
+            continue
+
+        # Skip non-numeric values
+        if not isinstance(usd_rate, (int, float)):
+            logger.warning("Skipping %s: rate is not numeric (%s)", currency, type(usd_rate).__name__)
+            continue
+
+        # Skip NaN and infinity
+        if math.isnan(usd_rate) or math.isinf(usd_rate):
+            logger.warning("Skipping %s: invalid float value (NaN or Inf)", currency)
+            continue
+
         if usd_rate <= 0:
             logger.warning("Skipping %s: invalid rate %s (must be positive)", currency, usd_rate)
             continue
