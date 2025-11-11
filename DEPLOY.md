@@ -12,7 +12,7 @@ Ensure you have:
 ## Step 1: Set Environment Variables
 
 ```bash
-export PROJECT_ID=rui-case  # Your GCP project ID
+export PROJECT_ID=rui-case  
 export OXR_APP_ID=your-openexchangerates-api-key
 export REGION=europe-west1
 ```
