@@ -3,8 +3,12 @@ import os
 from datetime import date, timedelta
 
 import requests
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from google.cloud import bigquery
+
+# Load environment variables from .env file
+load_dotenv()
 
 app = FastAPI()
 logger = logging.getLogger(__name__)
