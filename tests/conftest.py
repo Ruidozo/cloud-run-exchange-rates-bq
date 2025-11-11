@@ -1,4 +1,5 @@
 """Shared pytest fixtures and configuration."""
+import os
 from datetime import date, datetime, timezone
 from typing import Any, Dict
 from unittest.mock import patch
@@ -89,6 +90,21 @@ def mock_env_vars():
         'OXR_APP_ID': 'test-api-key'
     }):
         yield
+
+
+@pytest.fixture
+def setup_env(mock_env_vars):
+    """Setup required environment for tests."""
+    yield
+
+
+@pytest.fixture
+def bq_client(setup_env):
+    """Get BigQuery client with environment setup."""
+    if not os.getenv("PROJECT_ID"):
+        pytest.skip("PROJECT_ID not set")
+    from app.bq import get_client
+    return get_client()
 
 
 def pytest_configure(config):

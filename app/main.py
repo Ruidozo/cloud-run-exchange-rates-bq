@@ -9,6 +9,7 @@ import os
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Dict, List
 
+from dateutil.rrule import DAILY, rrule
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 
@@ -52,12 +53,13 @@ def ingest_exchange_rates():
     
     end_date = date.today()
     start_date = end_date - timedelta(days=30)
-    current_date = start_date
     
     all_records: List[Dict[str, Any]] = []
     failed_dates: List[Dict[str, str]] = []
     
-    while current_date <= end_date:
+    # Use rrule for cleaner iteration
+    for current_date in rrule(DAILY, dtstart=start_date, until=end_date):
+        current_date = current_date.date()
         try:
             logger.info("Processing date: %s", current_date)
             oxr_data = fetch_historical_rates(current_date)
@@ -90,8 +92,6 @@ def ingest_exchange_rates():
                 "date": current_date.isoformat(),
                 "error": str(e)
             })
-        
-        current_date += timedelta(days=1)
     
     # Upsert successful records even if some dates failed
     if all_records:
@@ -130,18 +130,8 @@ def ingest_exchange_rates():
 @app.on_event("startup")
 async def validate_environment():
     """Validate required environment variables on startup."""
-    required_vars = {
-        "PROJECT_ID": "Google Cloud Project ID",
-        "OXR_APP_ID": "Open Exchange Rates API Key"
-    }
-    
-    missing = []
-    for var, description in required_vars.items():
-        value = os.getenv(var)
-        if not value:
-            missing.append(f"{var} ({description})")
-        else:
-            logger.info("Environment variable %s is configured", var)
+    required_vars = ["PROJECT_ID", "OXR_APP_ID"]
+    missing = [var for var in required_vars if not os.getenv(var)]
     
     if missing:
         error_msg = f"Missing required environment variables: {', '.join(missing)}"
