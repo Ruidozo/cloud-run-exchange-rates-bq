@@ -1,51 +1,19 @@
-# app/main.py
-# Main FastAPI application for currency exchange rates ingestion service.
-# This application fetches exchange rates from Open Exchange Rates API,
-# converts them to EUR base, and upserts them into BigQuery using a staging table pattern
-
-
 import logging
 import os
 from datetime import date, timedelta
-from typing import Any, Dict, List
 
 import requests
-from dateutil.rrule import DAILY, rrule
-from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from google.cloud import bigquery
 
-from app.bq import upsert_exchange_rates
-from app.converter import convert_usd_to_eur_base
-from app.oxr import fetch_historical_rates
-
-# Load environment variables from .env file
-load_dotenv()
-
-logging.basicConfig(level=logging.INFO)
+app = FastAPI()
 logger = logging.getLogger(__name__)
-
-app = FastAPI(title="Currency Exchange Rates Service")
-
-# Currencies to track
-TRACKED_CURRENCIES = {"USD", "GBP", "JPY", "CHF" }
+logging.basicConfig(level=logging.INFO)
 
 
 @app.get("/health")
 def health():
-    """Health check endpoint."""
-    logger.info("Health check called")
     return {"status": "ok"}
-
-
-@app.get("/")
-def root():
-    """Root endpoint."""
-    logger.info("Root endpoint called")
-    return {
-        "message": "Currency Exchange Rates pipeline",
-        "project_id": os.getenv("PROJECT_ID", "local-dev"),
-    }
 
 
 @app.post("/ingest")
