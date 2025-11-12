@@ -220,13 +220,6 @@ gcloud scheduler jobs run exchange-rates-daily --location ${REGION}
 - BigQuery operations: 8 seconds
 - Total: ~30 seconds per run
 
-## Cost
-
-All components use free tier:
-- Cloud Run: up to 2M invocations/month
-- BigQuery: up to 1 TB scan/month
-- Cloud Scheduler: up to 3 jobs
-- **Total: $0.00/month**
 
 ## Troubleshooting
 
@@ -238,12 +231,6 @@ All components use free tier:
 | No data in BigQuery | Check logs: `gcloud run services logs read...` |
 | Deployment failed | View error: `gcloud run deploy ... --log-http` |
 
-## References
-
-- [OpenExchangeRates API Docs](https://openexchangerates.org/documentation)
-- [BigQuery MERGE Statement](https://cloud.google.com/bigquery/docs/reference/standard-sql/dml-syntax#merge-statement)
-- [Cloud Run Documentation](https://cloud.google.com/run/docs)
-- [Cloud Scheduler Documentation](https://cloud.google.com/scheduler/docs)
 
 ---
 

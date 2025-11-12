@@ -15,6 +15,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from google.cloud import bigquery
+from google.cloud.exceptions import NotFound
 
 # Configuration
 load_dotenv()
@@ -131,6 +132,23 @@ def log_structured(level: str, message: str, **kwargs):
     logger_func(json.dumps(log_entry))
 
 
+def ensure_staging_table_exists(client, staging_table: str):
+    """Create staging table if it doesn't exist."""
+    try:
+        client.get_table(staging_table)
+        logger.info(f"Staging table exists: {staging_table}")
+    except NotFound:
+        schema = [
+            bigquery.SchemaField("date", "DATE"),
+            bigquery.SchemaField("currency", "STRING"),
+            bigquery.SchemaField("rate_to_eur", "FLOAT64"),
+            bigquery.SchemaField("timestamp", "TIMESTAMP"),
+        ]
+        table = bigquery.Table(staging_table, schema=schema)
+        client.create_table(table)
+        logger.info(f"Created staging table: {staging_table}")
+
+
 # ============================================================================
 # ENDPOINTS
 # ============================================================================
@@ -209,6 +227,9 @@ async def ingest():
         # ====================================================================
         client = bigquery.Client(project=project_id)
         staging_table = f"{project_id}.exchange_rates.rates_staging"
+        
+        # Ensure staging table exists
+        ensure_staging_table_exists(client, staging_table)
         
         try:
             job_config = bigquery.LoadJobConfig(
