@@ -2,6 +2,33 @@
 
 A serverless pipeline that fetches daily exchange rates from the Open Exchange Rates API, converts to EUR base, and stores in BigQuery with idempotent upsert logic.
 
+## Table of Contents
+
+- [Exchange Rates Pipeline - Cloud Run to BigQuery](#exchange-rates-pipeline---cloud-run-to-bigquery)
+  - [Table of Contents](#table-of-contents)
+  - [Overview](#overview)
+  - [Architecture](#architecture)
+  - [How It Works](#how-it-works)
+    - [1. Fetch Phase](#1-fetch-phase)
+    - [2. Transform Phase](#2-transform-phase)
+    - [3. Load \& Merge Phase](#3-load--merge-phase)
+  - [Setup](#setup)
+    - [Prerequisites](#prerequisites)
+    - [Initial Setup](#initial-setup)
+  - [Local Testing](#local-testing)
+  - [Deploy to Cloud Run](#deploy-to-cloud-run)
+  - [Schedule Daily Runs](#schedule-daily-runs)
+  - [API Endpoints](#api-endpoints)
+    - [GET /health](#get-health)
+    - [POST /ingest](#post-ingest)
+  - [Query Data](#query-data)
+  - [Monitoring](#monitoring)
+  - [Design Decisions](#design-decisions)
+  - [Performance](#performance)
+  - [Troubleshooting](#troubleshooting)
+
+---
+
 ## Overview
 
 **Problem:** Manual daily process to fetch exchange rates and convert revenue across currencies.
@@ -220,7 +247,6 @@ gcloud scheduler jobs run exchange-rates-daily --location ${REGION}
 - BigQuery operations: 8 seconds
 - Total: ~30 seconds per run
 
-
 ## Troubleshooting
 
 | Issue | Solution |
@@ -230,7 +256,6 @@ gcloud scheduler jobs run exchange-rates-daily --location ${REGION}
 | 401 Unauthorized | Verify OXR_APP_ID is valid |
 | No data in BigQuery | Check logs: `gcloud run services logs read...` |
 | Deployment failed | View error: `gcloud run deploy ... --log-http` |
-
 
 ---
 

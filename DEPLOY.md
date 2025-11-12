@@ -1,5 +1,19 @@
 # Deployment Guide
 
+## Table of Contents
+
+- [Deployment Guide](#deployment-guide)
+  - [Table of Contents](#table-of-contents)
+  - [Step 1: Prerequisites](#step-1-prerequisites)
+  - [Step 2: BigQuery Setup](#step-2-bigquery-setup)
+  - [Step 3: Environment Variables](#step-3-environment-variables)
+  - [Step 4: Deploy to Cloud Run](#step-4-deploy-to-cloud-run)
+  - [Step 5: Test](#step-5-test)
+  - [Step 6: Automate](#step-6-automate)
+  - [Cleanup](#cleanup)
+
+---
+
 ## Step 1: Prerequisites
 
 ```bash
@@ -80,7 +94,7 @@ gcloud run services logs read exchange-rates-pipeline \
   --region ${REGION} --limit 50
 ```
 
-## Step 6: Automate (Optional)
+## Step 6: Automate
 
 Schedule daily runs with Cloud Scheduler:
 
